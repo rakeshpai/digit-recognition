@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Digit recognition</title>
+<style>
+  * {
+    box-sizing: border-box;
+    font-family: 'Lucida Sans', 'Lucida Sans Regular', 'Lucida Grande', 'Lucida Sans Unicode', Geneva, Verdana, sans-serif;
+  }
+
+  body {
+    text-align: center;
+  }
+
+  h1 {
+    font-size: 1.2em;
+    font-weight: bold;
+  }
+
+  #canvas {
+    border: 1px solid #999;
+    display: inline-block;
+    margin: 20px;
+  }
+
+  #confidence {
+    color: #999;
+  }
+</style>
+
+<h1>Digit recognition</h1>
+
+<div id="container">
+  <div id="loading">Loading...</div>
+</div>
+
+<template>
+  <div>
+    Draw a digit in the square below:
+    <canvas id="canvas" width="200px" height="200px" />
+  </div>
+  <div id="result"></div>
+  <button id="clear">Clear</button>
+</template>
+
+<script src="./run.js"></script>
+<script>
+  document.querySelector('#loading').remove();
+  document.querySelector('#container').append(document.querySelector('template').content.cloneNode(true));
+
+  const canvas = document.querySelector('canvas');
+  const ctx = canvas.getContext('2d');
+
+  const resetCanvas = () => {
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 20;
+    ctx.lineCap = 'round';
+  }
+
+  resetCanvas();
+
+  document.querySelector('#clear').addEventListener('click', () => {
+    canvas.width = canvas.width; // Great API
+    resetCanvas();
+    document.querySelector('#result').innerText = "";
+  });
+
+  const canvasToArray = () => {
+    const c2 = document.createElement('canvas');
+    c2.width = 28;
+    c2.height = 28;
+  
+    ctx2 = c2.getContext('2d');
+    ctx2.drawImage(canvas, 0, 0, 200, 200, 0, 0, 28, 28);
+  
+    const { data } = ctx2.getImageData(0, 0, 28, 28);
+    const arr = new Array(28*28);
+
+    for(let i=0; i<28*28; i++) {
+      arr[i] = (data[i*4] + data[i*4 + 1] + data[i*4 + 2] + data[i*4 + 3] + data[i*4 + 4]) > 100 ? 1 : 0;
+    }
+
+    return arr;
+  }
+
+  const whatDigitIsIt = () => {
+    const arr = canvasToArray();
+    const result = run(arr);
+    const highestIndex = result.reduce(
+      (max, x, i, arr) => x > arr[max] ? i : max,
+      0
+    );
+
+    const resultText = result[highestIndex] > 0.5
+      ? `I'm ${(result[highestIndex] * 100).toFixed(2)}% certain you drew a ${highestIndex}.`
+      : `Sorry, I can't understand that.`;
+
+    document.querySelector('#result').innerText = resultText;
+  }
+
+  let isDrawing = false;
+  let mousePosition = [0, 0];
+  let lastPosition = mousePosition;
+
+  const getMousePosition = e => {
+    const rect = canvas.getBoundingClientRect();
+    return [
+      e.clientX - rect.left,
+      e.clientY - rect.top
+    ]
+  };
+
+  canvas.addEventListener('mousedown', e => {
+    isDrawing = true;
+    lastPosition = getMousePosition(e);
+  }, false);
+
+  canvas.addEventListener('mouseup', e => {
+    isDrawing = false;
+    whatDigitIsIt();
+  }, false);
+
+  canvas.addEventListener('mousemove', e => {
+    mousePosition = getMousePosition(e);
+  }, false);
+
+  const getTouchPos = e => {
+    const rect = canvas.getBoundingClientRect();
+    return [
+      e.touches[0].clientX - rect.left,
+      e.touches[0].clientY - rect.top
+    ];
+  };
+
+  canvas.addEventListener('touchstart', e => {
+    e.preventDefault();
+    mousePosition = getTouchPos(e);
+    canvas.dispatchEvent(new MouseEvent('mousedown', {
+      clientX: e.touches[0].clientX,
+      clientY: e.touches[0].clientY
+    }));
+  }, false);
+
+  canvas.addEventListener('touchend', e => {
+    e.preventDefault();
+    canvas.dispatchEvent(new MouseEvent('mouseup', {}));
+  }, false);
+
+  canvas.addEventListener('touchmove', e => {
+    e.preventDefault();
+    canvas.dispatchEvent(new MouseEvent('mousemove', {
+      clientX: e.touches[0].clientX,
+      clientY: e.touches[0].clientY
+    }));
+  }, false);
+
+  const render = () => {
+    if(!isDrawing) return;
+
+    ctx.moveTo(...lastPosition);
+    ctx.lineTo(...mousePosition);
+    ctx.stroke();
+    lastPosition = mousePosition;
+  };
+
+  const drawLoop = () => {
+    requestAnimationFrame(drawLoop);
+    render();
+  };
+
+  drawLoop();
+</script>
