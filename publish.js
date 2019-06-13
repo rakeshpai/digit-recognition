@@ -11,6 +11,6 @@ mkdirp.sync('dist');
 
 ['index.html', 'run.js'].forEach(file => copyFileSync(file, `dist/${file}`));
 
-// ghpages.publish('dist', error => {
-//   console.log('Published. Error:', error)
-// });
+ghpages.publish('dist', error => {
+  console.log('Published. Error:', error)
+});
